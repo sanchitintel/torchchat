@@ -264,8 +264,9 @@ that is then loaded for inference. This can be done with both Python and C++ env
 
 The following example exports and executes the Llama3.1 8B Instruct
 model.  The first command compiles and performs the actual export.
-```
-python3 torchchat.py export llama3.1 --output-dso-path exportedModels/llama3.1.so
+
+```bash
+python3 torchchat.py export llama3.1 --output-aoti-package-path exportedModels/llama3_1_artifacts
 ```
 
 > [!NOTE]
@@ -279,7 +280,7 @@ case visit our [customization guide](docs/model_customization.md).
 
 To run in a python enviroment, use the generate subcommand like before, but include the dso file.
 
-```
+```bash
 python3 torchchat.py generate llama3.1 --dso-path exportedModels/llama3.1.so --prompt "Hello my name is"
 ```
 **Note:** Depending on which accelerator is used to generate the .dso file, the command may need the device specified: `--device (cuda | cpu)`.
@@ -292,9 +293,14 @@ To run in a C++ enviroment, we need to build the runner binary.
 scripts/build_native.sh aoti
 ```
 
-Then run the compiled executable, with the exported DSO from earlier.
+To compile the AOTI generated artifacts into a `.so`:
 ```bash
-cmake-out/aoti_run exportedModels/llama3.1.so -z `python3 torchchat.py where llama3.1`/tokenizer.model -l 3 -i "Once upon a time"
+make -C exportedModels/llama3_1_artifacts
+```
+
+Then run the compiled executable, with the compiled DSO.
+```bash
+cmake-out/aoti_run exportedModels/llama3_1_artifacts/llama3_1_artifacts.so -z `python3 torchchat.py where llama3.1`/tokenizer.model -l 3 -i "Once upon a time"
 ```
 **Note:** Depending on which accelerator is used to generate the .dso file, the runner may need the device specified: `-d (CUDA | CPU)`.
 

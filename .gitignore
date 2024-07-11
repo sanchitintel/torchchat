@@ -6,6 +6,7 @@ __pycache__/
 # C extensions
 *.so
 
+.vscode
 .model-artifacts/
 .venv
 .torchchat
@@ -21,3 +22,6 @@ runner-aoti/cmake-out/*
 
 # debug / logging files
 system_info.txt
+checkpoints/
+exportedModels/
+cmake-out/
