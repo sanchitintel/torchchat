@@ -133,6 +133,8 @@ class GeneratorArgs:
             reason = "model compilation"
         if builder_args.aoti_package_path:
             model_type = "PT2"
+        if builder_args.dso_path:
+            model_type = "DSO"
         if builder_args.pte_path:
             model_type = "PTE"
         if model_type and reason:
@@ -146,7 +148,7 @@ class GeneratorArgs:
         pte_path = getattr(args, "pte_path", None)
         aoti_package_path = getattr(args, "aoti_package_path", None)
         sequential_prefill = (
-            args.sequential_prefill or bool(aoti_package_path) or bool(pte_path)
+            args.sequential_prefill or bool(aoti_package_path) or bool(pte_path) or bool(dso_path)
         )
 
         return cls(

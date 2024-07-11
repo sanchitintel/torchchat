@@ -69,15 +69,18 @@ def export_for_server(
         dynamic_shapes = None
 
     with torch.nn.attention.sdpa_kernel([torch.nn.attention.SDPBackend.MATH]):
+        options = {"aot_inductor.package": package}
+        if not package:
+            options = {"aot_inductor.output_path": output_path}
         path = torch._export.aot_compile(
             model,
             args=input,
-            options={
-                "aot_inductor.output_path": output_path,
-                "aot_inductor.package": package,
-            },
+            options=options,
             dynamic_shapes=dynamic_shapes,
         )
+        if package:
+            from torch._inductor.package import package_aoti
+            path = package_aoti(output_path, path)
     print(f"The generated DSO model can be found at: {path}")
     return path
 

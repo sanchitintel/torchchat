@@ -266,7 +266,7 @@ The following example exports and executes the Llama3.1 8B Instruct
 model.  The first command compiles and performs the actual export.
 
 ```bash
-python3 torchchat.py export llama3.1 --output-aoti-package-path exportedModels/llama3_1_artifacts
+python3 torchchat.py export llama3.1 --output-aoti-package-path exportedModels/llama3_1_artifacts.pt2
 ```
 
 > [!NOTE]
@@ -281,7 +281,7 @@ case visit our [customization guide](docs/model_customization.md).
 To run in a python enviroment, use the generate subcommand like before, but include the dso file.
 
 ```bash
-python3 torchchat.py generate llama3.1 --dso-path exportedModels/llama3.1.so --prompt "Hello my name is"
+python3 torchchat.py generate llama3.1 --aoti-package-path exportedModels/llama3_1_artifacts.pt2 --prompt "Hello my name is"
 ```
 **Note:** Depending on which accelerator is used to generate the .dso file, the command may need the device specified: `--device (cuda | cpu)`.
 

@@ -520,9 +520,12 @@ def _initialize_model(
             # function, e.g. calling model.setup_cache will NOT touch
             # AOTI compiled and maintained model buffers such as kv_cache.
             from torch._inductor.package import load_package
-            model.forward = load_package(
-                str(builder_args.aoti_package_path.absolute()), builder_args.device
+            aoti_compiled_model = load_package(
+                str(builder_args.aoti_package_path.absolute())
             )
+            model.forward = aoti_compiled_model 
+            metadata = aoti_compiled_model.get_metadata()
+            builder_args.device = metadata["AOTI_DEVICE_KEY"]
         except:
             raise RuntimeError(f"Failed to load AOTI compiled {builder_args.aoti_package_path}")
 
