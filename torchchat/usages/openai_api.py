@@ -30,6 +30,40 @@ OPENAI_API_DEFAULT_MAX_TOKENS = 16
 
 # Message classes and associated objects - see the types of Messages under "Create Chat Completion >>> Request body >>> messages"
 
+@dataclass 
+class _ContentPart(ABC):
+    """A single part of a message content field.
+
+    See the "Assistants >>> Messages >>> Create Message >>> Request body >>> content >>> Show possible types" section of the OpenAI API docs for more details.
+    """
+
+    type: str
+
+@dataclass
+class ImageFile():
+    file_id: str
+    detail: Optional[str] = None
+
+@dataclass
+class ImageFileContentPart(_ContentPart):
+    type: str = "image_file"
+    image_file: ImageFile
+
+
+@dataclass
+class ImageUrl():
+    url: str
+    detail: Optional[str] = None
+
+@dataclass
+class ImageUrlContentPart(_ContentPart):
+    type: str = "image_url"
+    image_url: ImageUrl
+
+@dataclass
+class TextContentPart(_ContentPart):
+    text: str
+    type: str = "text"
 
 @dataclass
 class _AbstractMessage(ABC):
@@ -42,7 +76,7 @@ class _AbstractMessage(ABC):
     """
 
     role: str
-    content: Optional[str] = None
+    content: Optional[Union[List[_ContentPart], str]] = None
 
 
 @dataclass
@@ -185,7 +219,7 @@ class ChunkDelta:
 
     tool_calls: Optional[List[ToolCall]]
     role: Optional[str]
-    content: Optional[str]
+    content: Optional[Union[List[_ContentPart], str]] = None
 
 
 @dataclass
