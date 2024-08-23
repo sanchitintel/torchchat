@@ -144,7 +144,8 @@ class ModelArgs:
             # try to interpret as a single transformer config
             transformer_args: Dict[str, TransformerArgs] = {}
             transformer_args["text"] = TransformerArgs.from_params(loaded_params)
-            model_type = ModelType.TextOnly
+            if model_type := loaded_params.get("model_type", None) is None:
+                model_type = ModelType.TextOnly
         except TypeError:
             # try to interpret as a dict of transformer configs
             model_type = ModelType(loaded_params["model_type"])

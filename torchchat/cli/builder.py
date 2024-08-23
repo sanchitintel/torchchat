@@ -23,7 +23,8 @@ from distributed import (
 )
 from torch.distributed.device_mesh import DeviceMesh
 
-from torchchat.model import Model
+from torchchat.model import Model, ModelType
+from _torchchat_test_script import flamingo_meta_to_tune
 
 from torchchat.model_config.model_config import resolve_model_config
 from torchchat.utils.build_utils import (
@@ -33,7 +34,7 @@ from torchchat.utils.build_utils import (
     name_to_dtype,
 )
 from torchchat.utils.measure_time import measure_time
-from torchchat.utils.quantize import quantize_model
+# from torchchat.utils.quantize import quantize_model
 
 
 @dataclass
@@ -101,6 +102,7 @@ class BuilderArgs:
         checkpoint_path = args.checkpoint_path
         params_table = args.params_table
         if args.model:  # Using a named, well-known model
+            print('args.model', args.model)
             model_config = resolve_model_config(args.model)
 
             checkpoint_path = (
@@ -230,7 +232,11 @@ class TokenizerArgs:
 
         is_tiktoken = self.is_tiktoken
         is_sentencepiece = self.is_sentencepiece
-        use_tiktoken = model.config.transformer_args["text"].use_tiktoken
+        text_args = model.config.transformer_args.get("text")
+        if text_args is None:
+            use_tiktoken = model.config.model_type == ModelType.Flamingo
+        else:
+            use_tiktoken = text_args.use_tiktoken
 
         if not (is_tiktoken == use_tiktoken) or not (is_sentencepiece != use_tiktoken):
             raise RuntimeError(
@@ -262,7 +268,7 @@ class TokenizerArgs:
             raise RuntimeError("cannot find tokenizer model")
 
         if not tokenizer_path.is_file():
-            raise RuntimeError(f"did not find tokenizer at {tokenizer_path}")
+            raise RuntimeError(f"did not find tokenizer at {os.path.abspath(tokenizer_path)}")
 
         return cls(
             tokenizer_path=tokenizer_path,
@@ -328,7 +334,6 @@ def _load_model_default(builder_args, only_config=False):
     assert not builder_args.gguf_path
 
     model = _init_model_on_meta_device(builder_args)
-    # checkpoint = torch.load(str(builder_args.checkpoint_path), mmap=True, weights_only=True)
     cps = []
     if builder_args.checkpoint_dir is not None:
         # Load multiple checkpoint; ignore the single path.
@@ -356,17 +361,31 @@ def _load_model_default(builder_args, only_config=False):
     else:
         checkpoint = torch.load(
             str(builder_args.checkpoint_path),
-            map_location=builder_args.device,
-            mmap=True,
-            weights_only=True,
+            # map_location=builder_args.device,
+            # mmap=True,
+            # weights_only=True,
         )
+        print("Loading here")
 
     if "model" in checkpoint and "stories" in str(builder_args.checkpoint_path):
         checkpoint = checkpoint["model"]
     
-    checkpoint = {"text_transformer." + k: v for k, v in checkpoint.items()}
 
-    model.load_state_dict(checkpoint, assign=True, strict=True)
+    if model.config.model_type == ModelType.Flamingo:
+        import time
+        start = time.time()
+        model = Model.from_params(builder_args.params_path)
+        print("time to load params", time.time() - start)
+        
+        state_dict = flamingo_meta_to_tune(checkpoint)
+        print("time flamingo meta to tune", time.time() - start)
+        model.model.load_state_dict(state_dict)
+        print("time to load state dict", time.time() - start)   
+    else:
+        checkpoint = {"text_transformer." + k: v for k, v in checkpoint.items()}
+        model.load_state_dict(checkpoint, assign=True, strict=True)
+        
+
     return model
 
 
@@ -442,7 +461,8 @@ def _load_model(builder_args, only_config=False):
         model = _load_model_default(builder_args)
     model = _maybe_parellelize_model(model, builder_args, world_mesh, parallel_dims)
 
-    model = model.to(device=builder_args.device, dtype=builder_args.precision)
+    model = model.to(device=builder_args.device)#, dtype=builder_args.precision)
+    print(builder_args.device, builder_args.precision)
     return model.eval()
 
 
@@ -477,9 +497,9 @@ def _initialize_model(
         #     quantize is None or quantize == "{ }"
         # ), "quantize not valid for exported DSO model. Specify quantization during export."
 
-        with measure_time("Time to load model: {time:.02f} seconds"):
-            model = _load_model(builder_args, only_config=True)
-            device_sync(device=builder_args.device)
+        # with measure_time("Time to load model: {time:.02f} seconds"):
+        model = _load_model(builder_args, only_config=True)
+        device_sync(device=builder_args.device)
 
         try:
             # Replace model forward with the AOT-compiled forward
@@ -519,22 +539,22 @@ def _initialize_model(
             model = _load_model(builder_args)
             device_sync(device=builder_args.device)
 
-        if quantize:
-            print(f"Quantizing the model with: {quantize}")
-            with measure_time("Time to quantize model: {time:.02f} seconds"):
-                quantize_model(
-                    model,
-                    builder_args.device,
-                    quantize,
-                    tokenizer,
-                    support_tensor_subclass,
-                )
-                device_sync(device=builder_args.device)
+        # if quantize:
+        #     print(f"Quantizing the model with: {quantize}")
+        #     with measure_time("Time to quantize model: {time:.02f} seconds"):
+        #         quantize_model(
+        #             model,
+        #             builder_args.device,
+        #             quantize,
+        #             tokenizer,
+        #             support_tensor_subclass,
+        #         )
+        #         device_sync(device=builder_args.device)
 
         if builder_args.setup_caches:
             with torch.device(builder_args.device):
                 model.setup_caches(
-                    max_batch_size=1, max_seq_length=max_seq_length or model.config.transformer_args["text"].max_seq_length
+                    max_batch_size=1, max_seq_length=max_seq_length or model.config.transformer_args["text"].max_seq_length, 
                 )
 
         model.to(dtype=builder_args.precision)
